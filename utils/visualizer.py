@@ -43,11 +43,13 @@ def draw_strip_diagram(A: float, B: float, C: float, D: float, X: float):
     C = max(C, 1);  D = max(D, 1)
     X = min(max(X, 1), B - 1)
 
-    ref = max(A, B, C)
-    aw  = A / ref * 4.0
-    bl  = B / ref * 7.0
-    ch  = C / ref * 3.5
-    xw  = X / B * bl
+    # ── Eén schaalfactor voor alle assen zodat verhoudingen kloppen ───────
+    ref   = max(A, B, C)
+    scale = 7.0 / ref   # alle dimensies gebruiken dezelfde factor
+    aw = A * scale
+    bl = B * scale
+    ch = C * scale
+    xw = X * scale      # ook X op dezelfde schaal
 
     fig, ax = plt.subplots(figsize=(10, 6.5))
     ax.set_aspect("equal")
@@ -91,7 +93,7 @@ def draw_strip_diagram(A: float, B: float, C: float, D: float, X: float):
     face(ax, [(0,xw,0),(aw,xw,0),(aw,xw,ch),(0,xw,ch)],
          CUT_FACE, ec="none", lw=0, zorder=8)
 
-    # ── Randlijnen snijvlak (altijd bovenop) ──────────────────────────────
+    # ── Randlijnen snijvlak ───────────────────────────────────────────────
     p_bl_cut = iso(0,  xw, 0)
     p_br_cut = iso(aw, xw, 0)
     p_tl_cut = iso(0,  xw, ch)
@@ -108,7 +110,7 @@ def draw_strip_diagram(A: float, B: float, C: float, D: float, X: float):
 
     # ── Zaagblad ──────────────────────────────────────────────────────────
     saw_center = (p_tl_cut + p_tr_cut) / 2 + np.array([0, 0.9])
-    saw_r = 0.55
+    saw_r = 0.45
     circle = plt.Circle(saw_center, saw_r,
                         facecolor="#95a5a6", edgecolor="#2c3e50",
                         lw=1.5, zorder=21, alpha=0.92)
@@ -116,9 +118,9 @@ def draw_strip_diagram(A: float, B: float, C: float, D: float, X: float):
     for ang in np.linspace(0, 360, 20, endpoint=False):
         r  = np.radians(ang)
         t1 = saw_center + saw_r         * np.array([np.cos(r), np.sin(r)])
-        t2 = saw_center + (saw_r + 0.14)* np.array([np.cos(r), np.sin(r)])
-        ax.plot([t1[0], t2[0]], [t1[1], t2[1]], color="#2c3e50", lw=1.3, zorder=22)
-    ax.plot(*saw_center, "o", color="#2c3e50", ms=5, zorder=23)
+        t2 = saw_center + (saw_r + 0.12)* np.array([np.cos(r), np.sin(r)])
+        ax.plot([t1[0], t2[0]], [t1[1], t2[1]], color="#2c3e50", lw=1.2, zorder=22)
+    ax.plot(*saw_center, "o", color="#2c3e50", ms=4, zorder=23)
     cut_mid = (p_tl_cut + p_tr_cut) / 2
     ax.annotate("", xy=cut_mid, xytext=saw_center,
                 arrowprops=dict(arrowstyle="-|>", color="#2c3e50",
@@ -128,35 +130,33 @@ def draw_strip_diagram(A: float, B: float, C: float, D: float, X: float):
 
     # A – breedte voorkant
     dim_arrow(ax, (0,0,0), (aw,0,0),
-              f"A = {int(A)} mm", color="#1a1a2e", perp=(0, -0.6))
+              f"A = {int(A)} mm", color="#1a1a2e", perp=(0, -0.55))
 
-    # B – VOLLEDIGE lengte: van voorkant (y=0) tot achterkant (y=bl)
-    # Loopt langs de rechter onderrand van de HELE steen
+    # B – volledige lengte, rechts langs de onderkant
     dim_arrow(ax, (aw,0,0), (aw,bl,0),
-              f"B = {int(B)} mm", color="#374151", perp=(1.1, -0.55))
-
-    # Verlengde stippellijnen om aan te geven dat B de volle lengte dekt
+              f"B = {int(B)} mm", color="#374151", perp=(1.0, -0.5))
+    # Stippellijnen naar model
     p_front_r = iso(aw, 0,  0)
     p_back_r  = iso(aw, bl, 0)
-    p_arr_f   = p_front_r + np.array([1.1, -0.55])
-    p_arr_b   = p_back_r  + np.array([1.1, -0.55])
-    ax.plot([p_front_r[0], p_arr_f[0]], [p_front_r[1], p_arr_f[1]],
+    ax.plot([p_front_r[0], p_front_r[0] + 1.0],
+            [p_front_r[1], p_front_r[1] - 0.5],
             ":", color="#374151", lw=1.0, zorder=14)
-    ax.plot([p_back_r[0],  p_arr_b[0]], [p_back_r[1],  p_arr_b[1]],
+    ax.plot([p_back_r[0],  p_back_r[0]  + 1.0],
+            [p_back_r[1],  p_back_r[1]  - 0.5],
             ":", color="#374151", lw=1.0, zorder=14)
 
-    # X – zaagsnede positie
+    # X – zaagsnede
     dim_arrow(ax, (0,0,0), (0,xw,0),
               f"X = {int(X)} mm", color=RED_FRONT, perp=(-0.7, -0.35))
 
     # C – hoogte
     p_br  = iso(aw, 0, 0)
     p_tr2 = iso(aw, 0, ch)
-    off   = np.array([0.55, 0])
+    off   = np.array([0.5, 0])
     ax.annotate("", xy=p_tr2 + off, xytext=p_br + off,
                 arrowprops=dict(arrowstyle="<->", color="#374151",
                                 lw=1.3, mutation_scale=10), zorder=15)
-    mid_c = (p_br + p_tr2) / 2 + off + np.array([0.5, 0])
+    mid_c = (p_br + p_tr2) / 2 + off + np.array([0.45, 0])
     ax.text(mid_c[0], mid_c[1], f"C = {int(C)} mm",
             ha="left", va="center", fontsize=8.5, fontweight="bold",
             color="#374151", zorder=16,
