@@ -135,4 +135,91 @@ with col_form:
     col1, col2 = st.columns(2)
     with col1:
         A = st.number_input("A – Breedte (mm)", min_value=0,
-                            value=int(steen_A) if steen_A el
+                            value=int(steen_A) if steen_A else 210, step=1)
+        B = st.number_input("B – Lengte (mm)", min_value=0,
+                            value=int(steen_B) if steen_B else 1000, step=1)
+        C = st.number_input("C – Hoogte (mm)", min_value=0,
+                            value=int(steen_C) if steen_C else 65, step=1)
+    with col2:
+        D = st.number_input("D – Diepte (mm)",           min_value=0, value=22,  step=1)
+        X = st.number_input("X – Zaagsnede voor (mm)",   min_value=0, value=300, step=1,
+                            help="Afstand zaagsnede vanaf de voorkant")
+        Y = st.number_input("Y – Zaagsnede achter (mm)", min_value=0, value=0,   step=1,
+                            help="Afstand zaagsnede vanaf de achterkant (0 = geen Y-snede)")
+
+    # Validatie
+    if X > 0 and Y > 0 and B > 0 and (X + Y) >= B:
+        st.error("⚠️ X + Y mag niet groter zijn dan of gelijk zijn aan B.")
+    elif X > 0 and B > 0 and X >= B:
+        st.warning("⚠️ X mag niet groter zijn dan of gelijk zijn aan B.")
+
+    st.markdown("---")
+    opmerkingen = st.text_area("Opmerkingen", height=70,
+                               placeholder="Eventuele extra informatie…")
+
+    if st.button("📄 Genereer PDF-formulier", use_container_width=True, type="primary"):
+        data = dict(
+            bedrijf=bedrijf, contactpersoon=contactpers, project=project,
+            sortering=sortering, stuks=stuks,
+            leverdatum=str(leverdatum), opmerkingen=opmerkingen,
+            steenformaat=gekozen if steen_A else "",
+            A=A, B=B, C=C, D=D, X=X, Y=Y,
+        )
+        pdf_bytes = generate_pdf(data)
+        st.download_button(
+            label="⬇️ Download PDF",
+            data=pdf_bytes,
+            file_name=f"deko_steenstrip_{project or 'order'}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
+
+with col_vis:
+
+    st.markdown('<div class="section-title">🎨 Visuele weergave</div>', unsafe_allow_html=True)
+
+    fig = draw_strip_diagram(A=A, B=B, C=C, D=D, X=X, Y=Y)
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
+
+    st.markdown("---")
+    st.markdown('<div class="section-title">📊 Maatoverzicht</div>', unsafe_allow_html=True)
+
+    benodigd = B - X - Y if Y > 0 else X
+    restant  = B - benodigd
+
+    labels = ["A", "B", "C", "D", "X", "Y"] if Y > 0 else ["A", "B", "C", "D", "X"]
+    values = [A,   B,   C,   D,   X,   Y]   if Y > 0 else [A,   B,   C,   D,   X]
+    descs  = ["Breedte","Lengte","Hoogte","Diepte","Zaagsnede voor","Zaagsnede achter"] \
+             if Y > 0 else ["Breedte","Lengte","Hoogte","Diepte","Zaagsnede"]
+
+    cols = st.columns(len(labels))
+    for i, (lbl, val, desc) in enumerate(zip(labels, values, descs)):
+        with cols[i]:
+            color = "#e84545" if lbl in ("X", "Y") else "#1a1a2e"
+            st.markdown(f"""
+            <div style="background:{color};color:white;border-radius:8px;
+                        padding:0.6rem;text-align:center;margin-bottom:0.3rem">
+              <div style="font-size:1.3rem;font-weight:700">{val}</div>
+              <div style="font-size:0.6rem;opacity:0.8">mm</div>
+              <div style="font-size:0.65rem;font-weight:600;margin-top:2px">{lbl} – {desc}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown(f"""
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;
+                padding:0.8rem 1rem;margin-top:0.8rem;font-size:0.88rem">
+      ✂️ <b>Benodigd stuk:</b> {B - X - Y if Y > 0 else X} mm &nbsp;|&nbsp;
+      🗑️ <b>Totaal restant:</b> {X + Y if Y > 0 else B - X} mm
+      {"&nbsp;(X: " + str(X) + " mm + Y: " + str(Y) + " mm)" if Y > 0 else ""}
+    </div>
+    """, unsafe_allow_html=True)
+
+st.markdown("---")
+st.markdown("""
+<div style="text-align:center;color:#9ca3af;font-size:0.8rem;padding:0.5rem">
+  Deko B.V. · Peppelenbos 16, 6662 WB Elst (Gld) ·
+  T +31 (0) 481 – 366 466 ·
+  <a href="mailto:sales@deko.nu" style="color:#9ca3af">sales@deko.nu</a>
+</div>
+""", unsafe_allow_html=True)
