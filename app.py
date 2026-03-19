@@ -84,6 +84,14 @@ st.markdown("""
       background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px;
       padding: 0.7rem 1rem; margin-bottom: 0.8rem; font-size: 0.88rem;
   }
+  .cut-box-x {
+      background: #fef2f2; border: 1px solid #fecaca;
+      border-radius: 8px; padding: 0.6rem 0.8rem; margin-bottom: 0.5rem;
+  }
+  .cut-box-y {
+      background: #faf5ff; border: 1px solid #e9d5ff;
+      border-radius: 8px; padding: 0.6rem 0.8rem; margin-bottom: 0.5rem;
+  }
 </style>
 """, unsafe_allow_html=True)
 
@@ -95,10 +103,17 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# ── Session state voor snedes ──────────────────────────────────────────────────
+if "x_cuts" not in st.session_state:
+    st.session_state.x_cuts = [300]
+if "y_cuts" not in st.session_state:
+    st.session_state.y_cuts = []
+
 col_form, col_vis = st.columns([1, 1.4], gap="large")
 
 with col_form:
 
+    # — Klantgegevens —
     st.markdown('<div class="section-title">📋 Klantgegevens</div>', unsafe_allow_html=True)
     bedrijf     = st.text_input("Bedrijfsnaam",   placeholder="bijv. Bouwbedrijf De Vries")
     contactpers = st.text_input("Contactpersoon", placeholder="Naam contactpersoon")
@@ -112,11 +127,10 @@ with col_form:
 
     st.markdown("---")
 
+    # — Steenformaat —
     st.markdown('<div class="section-title">🧱 Steenformaat</div>', unsafe_allow_html=True)
-    gekozen = st.selectbox(
-        "Kies een steensoort (vult A, B en C automatisch in)",
-        options=list(STEENFORMATEN.keys()),
-    )
+    gekozen = st.selectbox("Kies een steensoort",
+                           options=list(STEENFORMATEN.keys()))
     steen_B, steen_A, steen_C = STEENFORMATEN[gekozen]
     if steen_A is not None:
         st.markdown(f"""
@@ -130,28 +144,86 @@ with col_form:
 
     st.markdown("---")
 
-    st.markdown('<div class="section-title">📐 Afmetingen (mm)</div>', unsafe_allow_html=True)
-
+    # — Basisafmetingen —
+    st.markdown('<div class="section-title">📐 Basisafmetingen (mm)</div>', unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
-        A = st.number_input("A – Breedte (mm)", min_value=0,
-                            value=int(steen_A) if steen_A else 210, step=1)
-        B = st.number_input("B – Lengte (mm)", min_value=0,
-                            value=int(steen_B) if steen_B else 1000, step=1)
-        C = st.number_input("C – Hoogte (mm)", min_value=0,
-                            value=int(steen_C) if steen_C else 65, step=1)
+        A = st.number_input("A – Breedte (mm)", min_value=1,
+                            value=int(steen_A) if steen_A else 100, step=1)
+        B = st.number_input("B – Lengte (mm)",  min_value=1,
+                            value=int(steen_B) if steen_B else 210, step=1)
     with col2:
-        D = st.number_input("D – Diepte (mm)",           min_value=0, value=22,  step=1)
-        X = st.number_input("X – Zaagsnede voor (mm)",   min_value=0, value=300, step=1,
-                            help="Afstand zaagsnede vanaf de voorkant")
-        Y = st.number_input("Y – Zaagsnede achter (mm)", min_value=0, value=0,   step=1,
-                            help="Afstand zaagsnede vanaf de achterkant (0 = geen Y-snede)")
+        C = st.number_input("C – Hoogte (mm)",  min_value=1,
+                            value=int(steen_C) if steen_C else 65, step=1)
+        D = st.number_input("D – Diepte (mm)",  min_value=1, value=22, step=1)
 
-    # Validatie
-    if X > 0 and Y > 0 and B > 0 and (X + Y) >= B:
-        st.error("⚠️ X + Y mag niet groter zijn dan of gelijk zijn aan B.")
-    elif X > 0 and B > 0 and X >= B:
-        st.warning("⚠️ X mag niet groter zijn dan of gelijk zijn aan B.")
+    st.markdown("---")
+
+    # — X-snedes (langs lengte, horizontaal) —
+    st.markdown('<div class="section-title">✂️ X-snedes – langs de lengte (horizontaal)</div>',
+                unsafe_allow_html=True)
+    st.caption("Positie in mm vanaf de voorkant van de steen")
+
+    x_vals = []
+    to_remove_x = None
+    for i, val in enumerate(st.session_state.x_cuts):
+        st.markdown('<div class="cut-box-x">', unsafe_allow_html=True)
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            v = st.number_input(f"X{i+1} positie (mm)", min_value=1,
+                                max_value=int(B)-1, value=min(val, B-1),
+                                step=1, key=f"xcut_{i}")
+            x_vals.append(v)
+        with c2:
+            st.write("")
+            st.write("")
+            if st.button("🗑️", key=f"del_x_{i}", help="Verwijder"):
+                to_remove_x = i
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    if to_remove_x is not None:
+        st.session_state.x_cuts.pop(to_remove_x)
+        st.rerun()
+
+    if st.button("➕ X-snede toevoegen", use_container_width=True):
+        st.session_state.x_cuts.append(min(100, B-1))
+        st.rerun()
+
+    st.session_state.x_cuts = x_vals
+
+    st.markdown("---")
+
+    # — Y-snedes (langs hoogte, verticaal) —
+    st.markdown('<div class="section-title">✂️ Y-snedes – langs de hoogte (verticaal)</div>',
+                unsafe_allow_html=True)
+    st.caption("Positie in mm vanaf de onderkant van de steen")
+
+    y_vals = []
+    to_remove_y = None
+    for i, val in enumerate(st.session_state.y_cuts):
+        st.markdown('<div class="cut-box-y">', unsafe_allow_html=True)
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            v = st.number_input(f"Y{i+1} positie (mm)", min_value=1,
+                                max_value=int(C)-1, value=min(val, C-1),
+                                step=1, key=f"ycut_{i}")
+            y_vals.append(v)
+        with c2:
+            st.write("")
+            st.write("")
+            if st.button("🗑️", key=f"del_y_{i}", help="Verwijder"):
+                to_remove_y = i
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    if to_remove_y is not None:
+        st.session_state.y_cuts.pop(to_remove_y)
+        st.rerun()
+
+    if st.button("➕ Y-snede toevoegen", use_container_width=True):
+        st.session_state.y_cuts.append(min(20, C-1))
+        st.rerun()
+
+    st.session_state.y_cuts = y_vals
 
     st.markdown("---")
     opmerkingen = st.text_area("Opmerkingen", height=70,
@@ -160,60 +232,75 @@ with col_form:
     if st.button("📄 Genereer PDF-formulier", use_container_width=True, type="primary"):
         data = dict(
             bedrijf=bedrijf, contactpersoon=contactpers, project=project,
-            sortering=sortering, stuks=stuks,
-            leverdatum=str(leverdatum), opmerkingen=opmerkingen,
+            sortering=sortering, stuks=stuks, leverdatum=str(leverdatum),
+            opmerkingen=opmerkingen,
             steenformaat=gekozen if steen_A else "",
-            A=A, B=B, C=C, D=D, X=X, Y=Y,
+            A=A, B=B, C=C, D=D,
+            X=str(x_vals), Y=str(y_vals),
         )
         pdf_bytes = generate_pdf(data)
         st.download_button(
-            label="⬇️ Download PDF",
-            data=pdf_bytes,
+            label="⬇️ Download PDF", data=pdf_bytes,
             file_name=f"deko_steenstrip_{project or 'order'}.pdf",
-            mime="application/pdf",
-            use_container_width=True,
+            mime="application/pdf", use_container_width=True,
         )
 
+# ── Rechter kolom: visualisatie ────────────────────────────────────────────────
 with col_vis:
 
     st.markdown('<div class="section-title">🎨 Visuele weergave</div>', unsafe_allow_html=True)
 
-    fig = draw_strip_diagram(A=A, B=B, C=C, D=D, X=X, Y=Y)
+    x_cuts_clean = sorted(set(x_vals))
+    y_cuts_clean = sorted(set(y_vals))
+
+    fig = draw_strip_diagram(A=A, B=B, C=C, D=D,
+                             x_cuts=x_cuts_clean,
+                             y_cuts=y_cuts_clean)
     st.pyplot(fig, use_container_width=True)
     plt.close(fig)
 
     st.markdown("---")
     st.markdown('<div class="section-title">📊 Maatoverzicht</div>', unsafe_allow_html=True)
 
-    benodigd = B - X - Y if Y > 0 else X
-    restant  = B - benodigd
-
-    labels = ["A", "B", "C", "D", "X", "Y"] if Y > 0 else ["A", "B", "C", "D", "X"]
-    values = [A,   B,   C,   D,   X,   Y]   if Y > 0 else [A,   B,   C,   D,   X]
-    descs  = ["Breedte","Lengte","Hoogte","Diepte","Zaagsnede voor","Zaagsnede achter"] \
-             if Y > 0 else ["Breedte","Lengte","Hoogte","Diepte","Zaagsnede"]
-
-    cols = st.columns(len(labels))
-    for i, (lbl, val, desc) in enumerate(zip(labels, values, descs)):
+    cols = st.columns(4)
+    for i, (lbl, val, desc) in enumerate([
+        ("A", A, "Breedte"), ("B", B, "Lengte"),
+        ("C", C, "Hoogte"),  ("D", D, "Diepte"),
+    ]):
         with cols[i]:
-            color = "#e84545" if lbl in ("X", "Y") else "#1a1a2e"
             st.markdown(f"""
-            <div style="background:{color};color:white;border-radius:8px;
-                        padding:0.6rem;text-align:center;margin-bottom:0.3rem">
+            <div style="background:#1a1a2e;color:white;border-radius:8px;
+                        padding:0.6rem;text-align:center">
               <div style="font-size:1.3rem;font-weight:700">{val}</div>
               <div style="font-size:0.6rem;opacity:0.8">mm</div>
               <div style="font-size:0.65rem;font-weight:600;margin-top:2px">{lbl} – {desc}</div>
-            </div>
-            """, unsafe_allow_html=True)
+            </div>""", unsafe_allow_html=True)
 
-    st.markdown(f"""
-    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;
-                padding:0.8rem 1rem;margin-top:0.8rem;font-size:0.88rem">
-      ✂️ <b>Benodigd stuk:</b> {B - X - Y if Y > 0 else X} mm &nbsp;|&nbsp;
-      🗑️ <b>Totaal restant:</b> {X + Y if Y > 0 else B - X} mm
-      {"&nbsp;(X: " + str(X) + " mm + Y: " + str(Y) + " mm)" if Y > 0 else ""}
-    </div>
-    """, unsafe_allow_html=True)
+    if x_cuts_clean:
+        st.markdown("**X-snedes (lengte):**")
+        xc = st.columns(len(x_cuts_clean))
+        for i, v in enumerate(x_cuts_clean):
+            with xc[i]:
+                st.markdown(f"""
+                <div style="background:#c0392b;color:white;border-radius:8px;
+                            padding:0.5rem;text-align:center">
+                  <div style="font-size:1.1rem;font-weight:700">{v}</div>
+                  <div style="font-size:0.6rem;opacity:0.8">mm</div>
+                  <div style="font-size:0.6rem;font-weight:600">X{i+1}</div>
+                </div>""", unsafe_allow_html=True)
+
+    if y_cuts_clean:
+        st.markdown("**Y-snedes (hoogte):**")
+        yc = st.columns(len(y_cuts_clean))
+        for i, v in enumerate(y_cuts_clean):
+            with yc[i]:
+                st.markdown(f"""
+                <div style="background:#8e44ad;color:white;border-radius:8px;
+                            padding:0.5rem;text-align:center">
+                  <div style="font-size:1.1rem;font-weight:700">{v}</div>
+                  <div style="font-size:0.6rem;opacity:0.8">mm</div>
+                  <div style="font-size:0.6rem;font-weight:600">Y{i+1}</div>
+                </div>""", unsafe_allow_html=True)
 
 st.markdown("---")
 st.markdown("""
