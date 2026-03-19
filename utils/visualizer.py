@@ -1,228 +1,165 @@
 """
 utils/visualizer.py
-Draws an isometric-style 3D diagram of the afgekorte steenstrip,
-matching the style of the Deko B.V. order form.
+Draws an isometric-style 3D diagram of the afgekorte steenstrip.
+Both the 'benodigde' and 'restant' parts are full 3D blocks.
 """
 
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from matplotlib.patches import FancyArrowPatch
-from matplotlib.colors import to_rgba
+from matplotlib.patches import Polygon
 
 
-# ── Isometric projection helpers ───────────────────────────────────────────────
-
-def iso(x, y, z, scale_x=1.0, scale_y=1.0):
-    """Convert 3-D (x,y,z) → 2-D isometric screen coordinates."""
-    sx = (x - y) * np.cos(np.radians(30)) * scale_x
-    sy = (x + y) * np.sin(np.radians(30)) * scale_y + z
-    return sx, sy
+def iso(x, y, z):
+    sx = (x - y) * np.cos(np.radians(30))
+    sy = (x + y) * np.sin(np.radians(30)) + z
+    return np.array([sx, sy])
 
 
-def iso_face(pts, scale_x=1.0, scale_y=1.0):
-    """Convert list of (x,y,z) to array of 2-D iso coords."""
-    xs, ys = zip(*[iso(p[0], p[1], p[2], scale_x, scale_y) for p in pts])
-    return list(zip(xs, ys))
+def face(ax, pts3d, fc, ec="#222222", lw=1.1, alpha=1.0, zorder=1):
+    pts2d = [iso(p[0], p[1], p[2]) for p in pts3d]
+    poly = Polygon(pts2d, closed=True, facecolor=fc,
+                   edgecolor=ec, linewidth=lw, alpha=alpha, zorder=zorder)
+    ax.add_patch(poly)
+    return pts2d
 
 
-# ── Arrow / dimension annotation helper ───────────────────────────────────────
-
-def dim_arrow(ax, p1, p2, label, color="#1a1a2e", fontsize=9,
-              offset=(0, 6), xycoords="data"):
-    """Draw a dimension arrow between two 2-D points with a label."""
+def dim_arrow(ax, p1_3d, p2_3d, label, color="#1a1a2e",
+              perp=(0, 0), fontsize=8.5, zorder=15):
+    p1 = iso(*p1_3d) + np.array(perp)
+    p2 = iso(*p2_3d) + np.array(perp)
     ax.annotate("", xy=p2, xytext=p1,
-                arrowprops=dict(arrowstyle="<->", color=color, lw=1.3))
-    mx = (p1[0] + p2[0]) / 2 + offset[0]
-    my = (p1[1] + p2[1]) / 2 + offset[1]
-    ax.text(mx, my, label, ha="center", va="center", fontsize=fontsize,
-            fontweight="bold", color=color,
-            bbox=dict(boxstyle="round,pad=0.2", fc="white", ec=color,
-                      lw=0.8, alpha=0.9))
+                arrowprops=dict(arrowstyle="<->", color=color,
+                                lw=1.4, mutation_scale=10),
+                zorder=zorder)
+    mid = (p1 + p2) / 2
+    ax.text(mid[0], mid[1], label,
+            ha="center", va="center", fontsize=fontsize,
+            fontweight="bold", color=color, zorder=zorder + 1,
+            bbox=dict(boxstyle="round,pad=0.25", fc="white",
+                      ec=color, lw=0.8, alpha=0.95))
 
-
-# ── Main drawing function ──────────────────────────────────────────────────────
 
 def draw_strip_diagram(A: float, B: float, C: float, D: float, X: float):
-    """
-    Draw an isometric-perspective brick strip diagram.
+    A = max(A, 1);  B = max(B, 1)
+    C = max(C, 1);  D = max(D, 1)
+    X = min(max(X, 1), B - 1)
 
-    Dimension convention (matching Deko form):
-      A = front face width  (x-direction)
-      B = total length       (y-direction, depth going back)
-      C = strip height       (z-direction, vertical)
-      D = strip thickness    (used as the real cross-section depth label)
-      X = cut position from left end
+    ref = max(A, B, C)
+    aw  = A / ref * 4.0
+    bl  = B / ref * 7.0
+    ch  = C / ref * 3.5
+    xw  = X / B * bl
 
-    Returns a matplotlib Figure.
-    """
-    # ── Normalise inputs (guard against zeros) ────────────────────────────────
-    A  = max(A,  1)
-    B  = max(B,  1)
-    C  = max(C,  1)
-    D  = max(D,  1)
-    X  = min(max(X, 0), B)   # clamp [0, B]
-
-    # ── Scale factors for nicer aspect ratio ──────────────────────────────────
-    # Map real mm to "drawing units" so the figure always looks balanced.
-    ref = max(A, B, C, D)
-    sx  = 6.0 / ref   # scale x (width A)
-    sy  = 3.5 / ref   # scale y (depth B)
-    sz  = 4.0 / ref   # scale z (height C)
-
-    # Geometry in normalised units
-    aw = A * sx
-    bl = B * sy
-    ch = C * sz
-    xw = X * sy   # X mapped to y-scale
-
-    # ── Figure setup ──────────────────────────────────────────────────────────
-    fig, ax = plt.subplots(figsize=(9, 6))
+    fig, ax = plt.subplots(figsize=(10, 6.5))
     ax.set_aspect("equal")
     ax.axis("off")
-    fig.patch.set_facecolor("#f8f9fb")
-    ax.set_facecolor("#f8f9fb")
+    fig.patch.set_facecolor("#f0f3f8")
+    ax.set_facecolor("#f0f3f8")
 
-    # ── iso shortcut with our scales ──────────────────────────────────────────
-    def i(x, y, z):
-        return iso(x, y, z, scale_x=1.0, scale_y=1.0)
+    RED_FRONT = "#c0392b"
+    RED_TOP   = "#e74c3c"
+    RED_SIDE  = "#922b21"
+    GRY_FRONT = "#bdc3c7"
+    GRY_TOP   = "#d5d8dc"
+    GRY_SIDE  = "#99a3a4"
+    CUT_FACE  = "#f5b7b1"
 
-    # ── 8 corners of the full box ──────────────────────────────────────────────
-    # (x=A-width, y=B-length, z=C-height)
-    #  Front-bottom-left=origin
-    corners = {
-        "FBL": (0,   0,  0),
-        "FBR": (aw,  0,  0),
-        "FTL": (0,   0,  ch),
-        "FTR": (aw,  0,  ch),
-        "BBL": (0,   bl, 0),
-        "BBR": (aw,  bl, 0),
-        "BTL": (0,   bl, ch),
-        "BTR": (aw,  bl, ch),
-    }
-    c = {k: i(*v) for k, v in corners.items()}
+    # RESTANT block (back part: y from xw to bl)
+    face(ax, [(0,xw,0),(aw,xw,0),(aw,bl,0),(0,bl,0)],
+         GRY_SIDE,  ec="#7f8c8d", lw=0.8, alpha=0.5, zorder=2)
+    face(ax, [(0,xw,ch),(aw,xw,ch),(aw,bl,ch),(0,bl,ch)],
+         GRY_TOP,   ec="#7f8c8d", lw=0.9, alpha=0.85, zorder=3)
+    face(ax, [(aw,xw,0),(aw,bl,0),(aw,bl,ch),(aw,xw,ch)],
+         GRY_SIDE,  ec="#7f8c8d", lw=0.8, alpha=0.7, zorder=3)
+    face(ax, [(0,xw,0),(0,bl,0),(0,bl,ch),(0,xw,ch)],
+         GRY_FRONT, ec="#7f8c8d", lw=0.8, alpha=0.5, zorder=3)
+    face(ax, [(0,bl,0),(aw,bl,0),(aw,bl,ch),(0,bl,ch)],
+         GRY_FRONT, ec="#7f8c8d", lw=0.8, alpha=0.4, zorder=2)
 
-    # ── Cut plane corners (at y = xw) ─────────────────────────────────────────
-    cut = {
-        "CBL": (0,   xw, 0),
-        "CBR": (aw,  xw, 0),
-        "CTL": (0,   xw, ch),
-        "CTR": (aw,  xw, ch),
-    }
-    k = {kk: i(*vv) for kk, vv in cut.items()}
+    # BENODIGDE block (front part: y from 0 to xw)
+    face(ax, [(0,0,0),(aw,0,0),(aw,xw,0),(0,xw,0)],
+         RED_SIDE,  ec="#1a1a2e", lw=1.1, zorder=4)
+    face(ax, [(0,0,ch),(aw,0,ch),(aw,xw,ch),(0,xw,ch)],
+         RED_TOP,   ec="#1a1a2e", lw=1.1, zorder=5)
+    face(ax, [(aw,0,0),(aw,xw,0),(aw,xw,ch),(aw,0,ch)],
+         RED_SIDE,  ec="#1a1a2e", lw=1.1, zorder=5)
+    face(ax, [(0,0,0),(aw,0,0),(aw,0,ch),(0,0,ch)],
+         RED_FRONT, ec="#1a1a2e", lw=1.5, zorder=6)
 
-    # ── Helper to draw a filled face ──────────────────────────────────────────
-    def face(pts_2d, facecolor, edgecolor="#1a1a2e", lw=1.2, alpha=1.0, zorder=1):
-        from matplotlib.patches import Polygon
-        poly = Polygon(pts_2d, closed=True, facecolor=facecolor,
-                       edgecolor=edgecolor, lw=lw, alpha=alpha, zorder=zorder)
-        ax.add_patch(poly)
+    # Cut face
+    face(ax, [(0,xw,0),(aw,xw,0),(aw,xw,ch),(0,xw,ch)],
+         CUT_FACE, ec=RED_FRONT, lw=2.0, zorder=7)
 
-    # ── RESTANT (grey, back part B → X) ───────────────────────────────────────
-    restant_front = [k["CBL"], k["CBR"], k["CTR"], k["CTL"]]
-    restant_top   = [k["CTL"], k["CTR"], c["BTR"], c["BTL"]]
-    restant_side  = [k["CBR"], c["BBR"], c["BTR"], k["CTR"]]
+    # Dashed cut line
+    p_tl = iso(0,  xw, ch)
+    p_tr = iso(aw, xw, ch)
+    ax.plot([p_tl[0], p_tr[0]], [p_tl[1], p_tr[1]],
+            "--", color=RED_FRONT, lw=1.8, dashes=(5, 3), zorder=8)
 
-    face(restant_top,   "#d1d5db", "#6b7280", lw=0.8, alpha=0.6, zorder=2)
-    face(restant_side,  "#9ca3af", "#6b7280", lw=0.8, alpha=0.6, zorder=2)
-    face(restant_front, "#e5e7eb", "#6b7280", lw=0.8, alpha=0.6, zorder=3)
-
-    # ── BENODIGD (red, front part 0 → X) ──────────────────────────────────────
-    needed_bottom = [c["FBL"], c["FBR"], k["CBR"], k["CBL"]]
-    needed_front  = [c["FBL"], c["FBR"], c["FTR"], c["FTL"]]
-    needed_top    = [c["FTL"], c["FTR"], k["CTR"], k["CTL"]]
-    needed_side   = [c["FBR"], k["CBR"], k["CTR"], c["FTR"]]
-
-    DEKO_RED   = "#c0392b"
-    DEKO_DARK  = "#922b21"
-    DEKO_LIGHT = "#e74c3c"
-
-    face(needed_bottom, DEKO_DARK,  DEKO_DARK,  lw=1.2, zorder=4)
-    face(needed_top,    DEKO_LIGHT, DEKO_DARK,  lw=1.2, zorder=5)
-    face(needed_side,   DEKO_DARK,  DEKO_DARK,  lw=1.2, zorder=5)
-    face(needed_front,  DEKO_RED,   "#1a1a2e",  lw=1.5, zorder=6)
-
-    # ── Cut face (lighter red) ─────────────────────────────────────────────────
-    cut_face = [k["CBL"], k["CBR"], k["CTR"], k["CTL"]]
-    face(cut_face, "#fadbd8", DEKO_RED, lw=2.0, zorder=7)
-
-    # ── Dashed cut line (vertical at x=xw) ────────────────────────────────────
-    x_cut_vals = [c[0] for c in [k["CTL"], k["CTR"]]]
-    y_cut_vals = [c[1] for c in [k["CTL"], k["CTR"]]]
-    ax.plot(x_cut_vals, y_cut_vals, "--", color=DEKO_RED, lw=1.5,
-            zorder=8, dashes=(5, 3))
-
-    # ── Saw blade icon (simple circle with tick marks) ────────────────────────
-    saw_cx = (k["CTL"][0] + k["CTR"][0]) / 2
-    saw_cy = (k["CTL"][1] + k["CTR"][1]) / 2 + 0.55
-    saw_r  = 0.35
-    circle = plt.Circle((saw_cx, saw_cy), saw_r,
-                         facecolor="#9ca3af", edgecolor="#374151",
-                         lw=1.5, zorder=9, alpha=0.9)
+    # Saw blade
+    saw_center = (p_tl + p_tr) / 2 + np.array([0, 0.9])
+    saw_r = 0.55
+    circle = plt.Circle(saw_center, saw_r,
+                        facecolor="#95a5a6", edgecolor="#2c3e50",
+                        lw=1.5, zorder=9, alpha=0.92)
     ax.add_patch(circle)
-    # Teeth around the blade
-    for ang in np.linspace(0, 360, 18, endpoint=False):
-        rad  = np.radians(ang)
-        tx   = saw_cx + saw_r * np.cos(rad)
-        ty   = saw_cy + saw_r * np.sin(rad)
-        tx2  = saw_cx + (saw_r + 0.1) * np.cos(rad)
-        ty2  = saw_cy + (saw_r + 0.1) * np.sin(rad)
-        ax.plot([tx, tx2], [ty, ty2], color="#374151", lw=1.2, zorder=10)
-    # Blade centre
-    ax.plot(saw_cx, saw_cy, "o", color="#374151", ms=4, zorder=11)
+    for ang in np.linspace(0, 360, 20, endpoint=False):
+        r = np.radians(ang)
+        t1 = saw_center + saw_r        * np.array([np.cos(r), np.sin(r)])
+        t2 = saw_center + (saw_r+0.14) * np.array([np.cos(r), np.sin(r)])
+        ax.plot([t1[0], t2[0]], [t1[1], t2[1]], color="#2c3e50", lw=1.3, zorder=10)
+    ax.plot(*saw_center, "o", color="#2c3e50", ms=5, zorder=11)
+    cut_mid = (p_tl + p_tr) / 2
+    ax.annotate("", xy=cut_mid, xytext=saw_center,
+                arrowprops=dict(arrowstyle="-|>", color="#2c3e50",
+                                lw=1.2, mutation_scale=10), zorder=12)
 
-    # ── DIMENSION ANNOTATIONS ──────────────────────────────────────────────────
-    # A – breedte (front bottom edge)
-    pA1 = c["FBL"]
-    pA2 = c["FBR"]
-    dim_arrow(ax, (pA1[0], pA1[1] - 0.35), (pA2[0], pA2[1] - 0.35),
-              f"A = {int(A)} mm", color="#1a1a2e", offset=(0, -0.22))
+    # DIMENSIONS
+    dim_arrow(ax, (0,0,0), (aw,0,0),
+              f"A = {int(A)} mm", color="#1a1a2e", perp=(0, -0.6))
+    dim_arrow(ax, (aw,0,0), (aw,bl,0),
+              f"B = {int(B)} mm", color="#374151", perp=(0.7, -0.35))
+    dim_arrow(ax, (0,0,0), (0,xw,0),
+              f"X = {int(X)} mm", color=RED_FRONT, perp=(-0.7, -0.35))
 
-    # B – totale lengte (bottom right edge, going back)
-    pB1 = c["FBR"]
-    pB2 = c["BBR"]
-    boff = 0.42
-    dim_arrow(ax, (pB1[0] + boff, pB1[1] - 0.18),
-              (pB2[0] + boff, pB2[1] - 0.18),
-              f"B = {int(B)} mm", color="#374151", offset=(0.3, 0))
-
-    # C – hoogte (right face, vertical)
-    pC1 = c["FBR"]
-    pC2 = c["FTR"]
-    dim_arrow(ax, (pC1[0] + 0.35, pC1[1]),
-              (pC2[0] + 0.35, pC2[1]),
-              f"C = {int(C)} mm", color="#374151", offset=(0.42, 0))
-
-    # D – label on the left face, just text (diepte label shown on left side)
-    d_mid = ((c["FBL"][0] + c["BBL"][0]) / 2 - 0.5,
-             (c["FBL"][1] + c["BBL"][1]) / 2)
-    ax.text(d_mid[0], d_mid[1], f"D = {int(D)} mm",
-            ha="right", va="center", fontsize=9, fontweight="bold",
-            color="#374151",
+    p_br  = iso(aw, 0, 0)
+    p_tr2 = iso(aw, 0, ch)
+    off = np.array([0.55, 0])
+    ax.annotate("", xy=p_tr2 + off, xytext=p_br + off,
+                arrowprops=dict(arrowstyle="<->", color="#374151",
+                                lw=1.3, mutation_scale=10), zorder=15)
+    mid_c = (p_br + p_tr2) / 2 + off + np.array([0.5, 0])
+    ax.text(mid_c[0], mid_c[1], f"C = {int(C)} mm",
+            ha="left", va="center", fontsize=8.5, fontweight="bold",
+            color="#374151", zorder=16,
             bbox=dict(boxstyle="round,pad=0.25", fc="white",
-                      ec="#374151", lw=0.8, alpha=0.9))
+                      ec="#374151", lw=0.8, alpha=0.95))
 
-    # X – cut position (front bottom to cut bottom)
-    pX1 = c["FBL"]
-    pX2 = k["CBL"]
-    dim_arrow(ax, (pX1[0] - 0.45, pX1[1]),
-              (pX2[0] - 0.45, pX2[1]),
-              f"X = {int(X)} mm", color=DEKO_RED, offset=(-0.52, 0))
+    p_dl = iso(0, bl * 0.6, ch * 0.5)
+    ax.text(p_dl[0] - 0.5, p_dl[1], f"D = {int(D)} mm",
+            ha="right", va="center", fontsize=8.5, fontweight="bold",
+            color="#374151", zorder=16,
+            bbox=dict(boxstyle="round,pad=0.25", fc="white",
+                      ec="#374151", lw=0.8, alpha=0.95))
 
-    # ── Legend ────────────────────────────────────────────────────────────────
-    leg_x = ax.get_xlim()[1] if ax.get_xlim()[1] != 0 else 3
+    # LEGEND
     patches = [
-        mpatches.Patch(facecolor=DEKO_RED,  edgecolor="#1a1a2e", label="Benodigde strip"),
-        mpatches.Patch(facecolor="#d1d5db", edgecolor="#6b7280", label="Restant"),
+        mpatches.Patch(facecolor=RED_FRONT, edgecolor="#1a1a2e", label="Benodigde strip"),
+        mpatches.Patch(facecolor=GRY_TOP,   edgecolor="#7f8c8d", label="Restant"),
     ]
-    ax.legend(handles=patches, loc="lower right", fontsize=8.5,
-              framealpha=0.9, edgecolor="#d1d5db")
+    ax.legend(handles=patches, loc="lower right", fontsize=9,
+              framealpha=0.95, edgecolor="#d1d5db",
+              bbox_to_anchor=(0.98, 0.02))
 
-    # ── Title ─────────────────────────────────────────────────────────────────
     ax.set_title("Steenstrippen – Afgekorte strip",
                  fontsize=11, fontweight="bold", color="#1a1a2e",
-                 pad=10, loc="left")
+                 loc="left", pad=10)
 
     ax.autoscale_view()
-    fig.tight_layout()
+    xl = ax.get_xlim(); yl = ax.get_ylim()
+    ax.set_xlim(xl[0] - 1.5, xl[1] + 2.2)
+    ax.set_ylim(yl[0] - 1.0, yl[1] + 1.8)
+
+    fig.tight_layout(pad=0.5)
     return fig
