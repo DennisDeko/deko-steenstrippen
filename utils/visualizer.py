@@ -38,18 +38,75 @@ def dim_arrow(ax, p1_3d, p2_3d, label, color="#1a1a2e",
                       ec=color, lw=0.8, alpha=0.95))
 
 
-def draw_strip_diagram(A: float, B: float, C: float, D: float, X: float):
+def draw_saw(ax, p_tl, p_tr, zorder=21):
+    """Teken een zaagblad boven het snijvlak."""
+    saw_center = (p_tl + p_tr) / 2 + np.array([0, 0.9])
+    saw_r = 0.45
+    circle = plt.Circle(saw_center, saw_r,
+                        facecolor="#95a5a6", edgecolor="#2c3e50",
+                        lw=1.5, zorder=zorder, alpha=0.92)
+    ax.add_patch(circle)
+    for ang in np.linspace(0, 360, 20, endpoint=False):
+        r  = np.radians(ang)
+        t1 = saw_center + saw_r         * np.array([np.cos(r), np.sin(r)])
+        t2 = saw_center + (saw_r + 0.12)* np.array([np.cos(r), np.sin(r)])
+        ax.plot([t1[0], t2[0]], [t1[1], t2[1]],
+                color="#2c3e50", lw=1.2, zorder=zorder + 1)
+    ax.plot(*saw_center, "o", color="#2c3e50", ms=4, zorder=zorder + 2)
+    cut_mid = (p_tl + p_tr) / 2
+    ax.annotate("", xy=cut_mid, xytext=saw_center,
+                arrowprops=dict(arrowstyle="-|>", color="#2c3e50",
+                                lw=1.2, mutation_scale=10),
+                zorder=zorder + 2)
+
+
+def draw_cut_face(ax, xw, aw, ch, RED_FRONT, zorder_base=8):
+    """Teken snijvlak + alle randlijnen op positie y=xw."""
+    CUT_FACE = "#f5b7b1"
+    face(ax, [(0,xw,0),(aw,xw,0),(aw,xw,ch),(0,xw,ch)],
+         CUT_FACE, ec="none", lw=0, zorder=zorder_base)
+
+    p_bl = iso(0,  xw, 0)
+    p_br = iso(aw, xw, 0)
+    p_tl = iso(0,  xw, ch)
+    p_tr = iso(aw, xw, ch)
+
+    ax.plot([p_bl[0], p_tl[0]], [p_bl[1], p_tl[1]],
+            color="#1a1a2e", lw=1.8, zorder=20)
+    ax.plot([p_br[0], p_tr[0]], [p_br[1], p_tr[1]],
+            color="#1a1a2e", lw=1.8, zorder=20)
+    ax.plot([p_bl[0], p_br[0]], [p_bl[1], p_br[1]],
+            color="#1a1a2e", lw=1.8, zorder=20)
+    ax.plot([p_tl[0], p_tr[0]], [p_tl[1], p_tr[1]],
+            "--", color=RED_FRONT, lw=1.8, dashes=(5, 3), zorder=20)
+
+    return p_tl, p_tr
+
+
+def draw_strip_diagram(A: float, B: float, C: float, D: float,
+                       X: float, Y: float = 0):
+    """
+    Teken isometrisch 3D diagram met X-snede (voorkant) en Y-snede (achterkant).
+
+      X = afstand zaagsnede vanaf voorkant
+      Y = afstand zaagsnede vanaf achterkant (0 = geen Y-snede)
+
+    Benodigde stuk = van X tot (B - Y)
+    """
     A = max(A, 1);  B = max(B, 1)
     C = max(C, 1);  D = max(D, 1)
+    Y = max(Y, 0)
     X = min(max(X, 1), B - 1)
+    if Y > 0:
+        Y = min(Y, B - X - 1)
 
-    # ── Eén schaalfactor voor alle assen zodat verhoudingen kloppen ───────
     ref   = max(A, B, C)
-    scale = 7.0 / ref   # alle dimensies gebruiken dezelfde factor
+    scale = 7.0 / ref
     aw = A * scale
     bl = B * scale
     ch = C * scale
-    xw = X * scale      # ook X op dezelfde schaal
+    xw = X * scale
+    yw = (B - Y) * scale   # positie Y-snede vanuit voorkant
 
     fig, ax = plt.subplots(figsize=(10, 6.5))
     ax.set_aspect("equal")
@@ -63,79 +120,73 @@ def draw_strip_diagram(A: float, B: float, C: float, D: float, X: float):
     GRY_FRONT = "#bdc3c7"
     GRY_TOP   = "#d5d8dc"
     GRY_SIDE  = "#99a3a4"
-    CUT_FACE  = "#f5b7b1"
 
-    # ── RESTANT block ─────────────────────────────────────────────────────
-    face(ax, [(0,xw,0),(aw,xw,0),(aw,bl,0),(0,bl,0)],
-         GRY_SIDE,  ec="#7f8c8d", lw=0.8, alpha=0.5, zorder=1)
-    face(ax, [(0,bl,0),(aw,bl,0),(aw,bl,ch),(0,bl,ch)],
-         GRY_FRONT, ec="#7f8c8d", lw=0.8, alpha=0.4, zorder=1)
-    face(ax, [(0,xw,0),(0,bl,0),(0,bl,ch),(0,xw,ch)],
-         GRY_FRONT, ec="#7f8c8d", lw=0.8, alpha=0.5, zorder=2)
-    face(ax, [(aw,xw,0),(aw,bl,0),(aw,bl,ch),(aw,xw,ch)],
-         GRY_SIDE,  ec="#7f8c8d", lw=0.8, alpha=0.7, zorder=2)
-    face(ax, [(0,xw,ch),(aw,xw,ch),(aw,bl,ch),(0,bl,ch)],
-         GRY_TOP,   ec="#7f8c8d", lw=0.9, alpha=0.85, zorder=3)
-
-    # ── BENODIGDE block ───────────────────────────────────────────────────
+    # ── RESTANT VOOR (van 0 tot xw) ───────────────────────────────────────
     face(ax, [(0,0,0),(aw,0,0),(aw,xw,0),(0,xw,0)],
-         RED_SIDE,  ec="#1a1a2e", lw=1.1, zorder=4)
+         GRY_SIDE,  ec="#7f8c8d", lw=0.8, alpha=0.5, zorder=1)
     face(ax, [(0,0,0),(0,xw,0),(0,xw,ch),(0,0,ch)],
-         RED_SIDE,  ec="#1a1a2e", lw=1.1, zorder=5)
+         GRY_FRONT, ec="#7f8c8d", lw=0.8, alpha=0.5, zorder=2)
     face(ax, [(aw,0,0),(aw,xw,0),(aw,xw,ch),(aw,0,ch)],
-         RED_SIDE,  ec="#1a1a2e", lw=1.1, zorder=5)
+         GRY_SIDE,  ec="#7f8c8d", lw=0.8, alpha=0.7, zorder=2)
     face(ax, [(0,0,ch),(aw,0,ch),(aw,xw,ch),(0,xw,ch)],
-         RED_TOP,   ec="#1a1a2e", lw=1.1, zorder=6)
+         GRY_TOP,   ec="#7f8c8d", lw=0.9, alpha=0.85, zorder=3)
     face(ax, [(0,0,0),(aw,0,0),(aw,0,ch),(0,0,ch)],
-         RED_FRONT, ec="#1a1a2e", lw=1.5, zorder=7)
+         GRY_FRONT, ec="#7f8c8d", lw=0.8, alpha=0.6, zorder=3)  # voorkant
 
-    # ── Snijvlak ──────────────────────────────────────────────────────────
-    face(ax, [(0,xw,0),(aw,xw,0),(aw,xw,ch),(0,xw,ch)],
-         CUT_FACE, ec="none", lw=0, zorder=8)
+    # ── RESTANT ACHTER (van yw tot bl) — alleen als Y > 0 ─────────────────
+    if Y > 0:
+        face(ax, [(0,yw,0),(aw,yw,0),(aw,bl,0),(0,bl,0)],
+             GRY_SIDE,  ec="#7f8c8d", lw=0.8, alpha=0.5, zorder=1)
+        face(ax, [(0,bl,0),(aw,bl,0),(aw,bl,ch),(0,bl,ch)],
+             GRY_FRONT, ec="#7f8c8d", lw=0.8, alpha=0.4, zorder=1)
+        face(ax, [(0,yw,0),(0,bl,0),(0,bl,ch),(0,yw,ch)],
+             GRY_FRONT, ec="#7f8c8d", lw=0.8, alpha=0.5, zorder=2)
+        face(ax, [(aw,yw,0),(aw,bl,0),(aw,bl,ch),(aw,yw,ch)],
+             GRY_SIDE,  ec="#7f8c8d", lw=0.8, alpha=0.7, zorder=2)
+        face(ax, [(0,yw,ch),(aw,yw,ch),(aw,bl,ch),(0,bl,ch)],
+             GRY_TOP,   ec="#7f8c8d", lw=0.9, alpha=0.85, zorder=3)
+    else:
+        # Geen Y-snede: restant loopt door tot achterkant
+        face(ax, [(0,xw,0),(aw,xw,0),(aw,bl,0),(0,bl,0)],
+             GRY_SIDE,  ec="#7f8c8d", lw=0.8, alpha=0.5, zorder=1)
+        face(ax, [(0,bl,0),(aw,bl,0),(aw,bl,ch),(0,bl,ch)],
+             GRY_FRONT, ec="#7f8c8d", lw=0.8, alpha=0.4, zorder=1)
+        face(ax, [(0,xw,0),(0,bl,0),(0,bl,ch),(0,xw,ch)],
+             GRY_FRONT, ec="#7f8c8d", lw=0.8, alpha=0.5, zorder=2)
+        face(ax, [(aw,xw,0),(aw,bl,0),(aw,bl,ch),(aw,xw,ch)],
+             GRY_SIDE,  ec="#7f8c8d", lw=0.8, alpha=0.7, zorder=2)
+        face(ax, [(0,xw,ch),(aw,xw,ch),(aw,bl,ch),(0,bl,ch)],
+             GRY_TOP,   ec="#7f8c8d", lw=0.9, alpha=0.85, zorder=3)
 
-    # ── Randlijnen snijvlak ───────────────────────────────────────────────
-    p_bl_cut = iso(0,  xw, 0)
-    p_br_cut = iso(aw, xw, 0)
-    p_tl_cut = iso(0,  xw, ch)
-    p_tr_cut = iso(aw, xw, ch)
+    # ── BENODIGDE block (van xw tot yw of bl) ─────────────────────────────
+    eind = yw if Y > 0 else bl
+    face(ax, [(0,xw,0),(aw,xw,0),(aw,eind,0),(0,eind,0)],
+         RED_SIDE,  ec="#1a1a2e", lw=1.1, zorder=4)
+    face(ax, [(0,xw,0),(0,eind,0),(0,eind,ch),(0,xw,ch)],
+         RED_SIDE,  ec="#1a1a2e", lw=1.1, zorder=5)
+    face(ax, [(aw,xw,0),(aw,eind,0),(aw,eind,ch),(aw,xw,ch)],
+         RED_SIDE,  ec="#1a1a2e", lw=1.1, zorder=5)
+    face(ax, [(0,xw,ch),(aw,xw,ch),(aw,eind,ch),(0,eind,ch)],
+         RED_TOP,   ec="#1a1a2e", lw=1.1, zorder=6)
 
-    ax.plot([p_bl_cut[0], p_tl_cut[0]], [p_bl_cut[1], p_tl_cut[1]],
-            color="#1a1a2e", lw=1.8, zorder=20)
-    ax.plot([p_br_cut[0], p_tr_cut[0]], [p_br_cut[1], p_tr_cut[1]],
-            color="#1a1a2e", lw=1.8, zorder=20)
-    ax.plot([p_bl_cut[0], p_br_cut[0]], [p_bl_cut[1], p_br_cut[1]],
-            color="#1a1a2e", lw=1.8, zorder=20)
-    ax.plot([p_tl_cut[0], p_tr_cut[0]], [p_tl_cut[1], p_tr_cut[1]],
-            "--", color=RED_FRONT, lw=1.8, dashes=(5, 3), zorder=20)
+    # ── X snijvlak ────────────────────────────────────────────────────────
+    p_tl_x, p_tr_x = draw_cut_face(ax, xw, aw, ch, RED_FRONT, zorder_base=8)
+    draw_saw(ax, p_tl_x, p_tr_x, zorder=21)
 
-    # ── Zaagblad ──────────────────────────────────────────────────────────
-    saw_center = (p_tl_cut + p_tr_cut) / 2 + np.array([0, 0.9])
-    saw_r = 0.45
-    circle = plt.Circle(saw_center, saw_r,
-                        facecolor="#95a5a6", edgecolor="#2c3e50",
-                        lw=1.5, zorder=21, alpha=0.92)
-    ax.add_patch(circle)
-    for ang in np.linspace(0, 360, 20, endpoint=False):
-        r  = np.radians(ang)
-        t1 = saw_center + saw_r         * np.array([np.cos(r), np.sin(r)])
-        t2 = saw_center + (saw_r + 0.12)* np.array([np.cos(r), np.sin(r)])
-        ax.plot([t1[0], t2[0]], [t1[1], t2[1]], color="#2c3e50", lw=1.2, zorder=22)
-    ax.plot(*saw_center, "o", color="#2c3e50", ms=4, zorder=23)
-    cut_mid = (p_tl_cut + p_tr_cut) / 2
-    ax.annotate("", xy=cut_mid, xytext=saw_center,
-                arrowprops=dict(arrowstyle="-|>", color="#2c3e50",
-                                lw=1.2, mutation_scale=10), zorder=23)
+    # ── Y snijvlak (alleen als Y > 0) ─────────────────────────────────────
+    if Y > 0:
+        p_tl_y, p_tr_y = draw_cut_face(ax, yw, aw, ch, "#e67e22", zorder_base=9)
+        draw_saw(ax, p_tl_y, p_tr_y, zorder=25)
 
     # ── MATEN ─────────────────────────────────────────────────────────────
 
-    # A – breedte voorkant
+    # A – breedte
     dim_arrow(ax, (0,0,0), (aw,0,0),
               f"A = {int(A)} mm", color="#1a1a2e", perp=(0, -0.55))
 
-    # B – volledige lengte, rechts langs de onderkant
+    # B – volledige lengte
     dim_arrow(ax, (aw,0,0), (aw,bl,0),
               f"B = {int(B)} mm", color="#374151", perp=(1.0, -0.5))
-    # Stippellijnen naar model
     p_front_r = iso(aw, 0,  0)
     p_back_r  = iso(aw, bl, 0)
     ax.plot([p_front_r[0], p_front_r[0] + 1.0],
@@ -145,9 +196,14 @@ def draw_strip_diagram(A: float, B: float, C: float, D: float, X: float):
             [p_back_r[1],  p_back_r[1]  - 0.5],
             ":", color="#374151", lw=1.0, zorder=14)
 
-    # X – zaagsnede
+    # X – zaagsnede voorkant
     dim_arrow(ax, (0,0,0), (0,xw,0),
               f"X = {int(X)} mm", color=RED_FRONT, perp=(-0.7, -0.35))
+
+    # Y – zaagsnede achterkant
+    if Y > 0:
+        dim_arrow(ax, (0,yw,0), (0,bl,0),
+                  f"Y = {int(Y)} mm", color="#e67e22", perp=(-0.7, -0.35))
 
     # C – hoogte
     p_br  = iso(aw, 0, 0)
@@ -163,7 +219,7 @@ def draw_strip_diagram(A: float, B: float, C: float, D: float, X: float):
             bbox=dict(boxstyle="round,pad=0.25", fc="white",
                       ec="#374151", lw=0.8, alpha=0.95))
 
-    # D – diepte label
+    # D – diepte
     p_dl = iso(0, bl * 0.6, ch * 0.5)
     ax.text(p_dl[0] - 0.5, p_dl[1], f"D = {int(D)} mm",
             ha="right", va="center", fontsize=8.5, fontweight="bold",
@@ -173,9 +229,14 @@ def draw_strip_diagram(A: float, B: float, C: float, D: float, X: float):
 
     # ── LEGENDA ───────────────────────────────────────────────────────────
     patches = [
-        mpatches.Patch(facecolor=RED_FRONT, edgecolor="#1a1a2e", label="Benodigde strip"),
-        mpatches.Patch(facecolor=GRY_TOP,   edgecolor="#7f8c8d", label="Restant"),
+        mpatches.Patch(facecolor=RED_FRONT,  edgecolor="#1a1a2e", label="Benodigde strip"),
+        mpatches.Patch(facecolor=GRY_TOP,    edgecolor="#7f8c8d", label="Restant"),
     ]
+    if Y > 0:
+        patches.append(
+            mpatches.Patch(facecolor="#f5b7b1", edgecolor="#e67e22",
+                           label="Y-snijvlak")
+        )
     ax.legend(handles=patches, loc="lower right", fontsize=9,
               framealpha=0.95, edgecolor="#d1d5db",
               bbox_to_anchor=(0.98, 0.02))
