@@ -1,8 +1,6 @@
 import streamlit as st
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 from datetime import date
-from io import BytesIO
 
 from utils.visualizer import draw_strip_diagram
 from utils.pdf_generator import generate_pdf
@@ -59,10 +57,8 @@ st.set_page_config(
     page_title="Deko – Steenstrippen Configurator",
     page_icon="🧱",
     layout="wide",
-    initial_sidebar_state="expanded",
 )
 
-# ── Custom CSS ─────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap');
@@ -91,7 +87,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ── Header ─────────────────────────────────────────────────────────────────────
 st.markdown("""
 <div class="deko-header">
   <span class="deko-badge">Geveloplossingen</span>
@@ -102,12 +97,8 @@ st.markdown("""
 
 col_form, col_vis = st.columns([1, 1.4], gap="large")
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# LEFT: Form
-# ═══════════════════════════════════════════════════════════════════════════════
 with col_form:
 
-    # — Klantgegevens —
     st.markdown('<div class="section-title">📋 Klantgegevens</div>', unsafe_allow_html=True)
     bedrijf     = st.text_input("Bedrijfsnaam",   placeholder="bijv. Bouwbedrijf De Vries")
     contactpers = st.text_input("Contactpersoon", placeholder="Naam contactpersoon")
@@ -121,17 +112,12 @@ with col_form:
 
     st.markdown("---")
 
-    # — Steenformaat kiezen —
     st.markdown('<div class="section-title">🧱 Steenformaat</div>', unsafe_allow_html=True)
-
     gekozen = st.selectbox(
         "Kies een steensoort (vult A, B en C automatisch in)",
         options=list(STEENFORMATEN.keys()),
     )
-
     steen_B, steen_A, steen_C = STEENFORMATEN[gekozen]
-
-    # Toon info-box als er een steen gekozen is
     if steen_A is not None:
         st.markdown(f"""
         <div class="steen-info">
@@ -144,92 +130,9 @@ with col_form:
 
     st.markdown("---")
 
-    # — Afmetingen —
     st.markdown('<div class="section-title">📐 Afmetingen (mm)</div>', unsafe_allow_html=True)
-    st.markdown('<small style="color:#6b7280">Automatisch ingevuld via steenformaat, of handmatig aanpassen.</small>',
-                unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
     with col1:
-        A = st.number_input("A – Breedte voorzijde (mm)", min_value=0,
-                            value=int(steen_A) if steen_A else 210, step=1)
-        B = st.number_input("B – Lengte strip (mm)",      min_value=0,
-                            value=int(steen_B) if steen_B else 1000, step=1)
-        C = st.number_input("C – Hoogte strip (mm)",      min_value=0,
-                            value=int(steen_C) if steen_C else 65, step=1)
-    with col2:
-        D = st.number_input("D – Diepte strip (mm)",      min_value=0, value=22, step=1)
-        X = st.number_input("X – Zaagsnede positie (mm)", min_value=0, value=300, step=1)
-
-    if X > 0 and B > 0 and X >= B:
-        st.warning("⚠️ X mag niet groter zijn dan of gelijk zijn aan B.")
-
-    st.markdown("---")
-
-    opmerkingen = st.text_area("Opmerkingen", height=70, placeholder="Eventuele extra informatie…")
-
-    if st.button("📄 Genereer PDF-formulier", use_container_width=True, type="primary"):
-        data = dict(
-            bedrijf=bedrijf, contactpersoon=contactpers, project=project,
-            sortering=sortering, stuks=stuks,
-            leverdatum=str(leverdatum), opmerkingen=opmerkingen,
-            steenformaat=gekozen if steen_A else "",
-            A=A, B=B, C=C, D=D, X=X,
-        )
-        pdf_bytes = generate_pdf(data)
-        st.download_button(
-            label="⬇️ Download PDF",
-            data=pdf_bytes,
-            file_name=f"deko_steenstrip_{project or 'order'}.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-        )
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# RIGHT: Visualization
-# ═══════════════════════════════════════════════════════════════════════════════
-with col_vis:
-
-    st.markdown('<div class="section-title">🎨 Visuele weergave</div>', unsafe_allow_html=True)
-
-    fig = draw_strip_diagram(A=A, B=B, C=C, D=D, X=X)
-    st.pyplot(fig, use_container_width=True)
-    plt.close(fig)
-
-    st.markdown("---")
-    st.markdown('<div class="section-title">📊 Maatoverzicht</div>', unsafe_allow_html=True)
-
-    rest = B - X if B > X else 0
-    cols = st.columns(5)
-    metrics = [("A", A, "Breedte"), ("B", B, "Lengte"), ("C", C, "Hoogte"),
-               ("D", D, "Diepte"),  ("X", X, "Zaagsnede")]
-    for i, (lbl, val, desc) in enumerate(metrics):
-        with cols[i]:
-            color = "#e84545" if lbl == "X" else "#1a1a2e"
-            st.markdown(f"""
-            <div style="background:{color};color:white;border-radius:8px;
-                        padding:0.6rem;text-align:center;margin-bottom:0.3rem">
-              <div style="font-size:1.4rem;font-weight:700">{val}</div>
-              <div style="font-size:0.65rem;opacity:0.8">mm</div>
-              <div style="font-size:0.7rem;font-weight:600;margin-top:2px">{lbl} – {desc}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-    if B > 0 and X > 0:
-        st.markdown(f"""
-        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;
-                    padding:0.8rem 1rem;margin-top:0.8rem;font-size:0.88rem">
-          ✂️ <b>Benodigd stuk:</b> {X} mm &nbsp;|&nbsp;
-          🗑️ <b>Restant:</b> {rest} mm
-        </div>
-        """, unsafe_allow_html=True)
-
-# ── Footer ─────────────────────────────────────────────────────────────────────
-st.markdown("---")
-st.markdown("""
-<div style="text-align:center;color:#9ca3af;font-size:0.8rem;padding:0.5rem">
-  Deko B.V. · Peppelenbos 16, 6662 WB Elst (Gld) ·
-  T +31 (0) 481 – 366 466 ·
-  <a href="mailto:sales@deko.nu" style="color:#9ca3af">sales@deko.nu</a>
-</div>
-""", unsafe_allow_html=True)
+        A = st.number_input("A – Breedte (mm)", min_value=0,
+                            value=int(steen_A) if steen_A el
