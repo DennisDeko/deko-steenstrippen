@@ -65,39 +65,41 @@ def draw_strip_diagram(A: float, B: float, C: float, D: float, X: float):
     GRY_SIDE  = "#99a3a4"
     CUT_FACE  = "#f5b7b1"
 
-    # RESTANT block (back part: y from xw to bl)
+    # ── RESTANT block (back part: y from xw to bl) ────────────────────────
     face(ax, [(0,xw,0),(aw,xw,0),(aw,bl,0),(0,bl,0)],
-         GRY_SIDE,  ec="#7f8c8d", lw=0.8, alpha=0.5, zorder=2)
+         GRY_SIDE,  ec="#7f8c8d", lw=0.8, alpha=0.5, zorder=2)   # bottom
     face(ax, [(0,xw,ch),(aw,xw,ch),(aw,bl,ch),(0,bl,ch)],
-         GRY_TOP,   ec="#7f8c8d", lw=0.9, alpha=0.85, zorder=3)
+         GRY_TOP,   ec="#7f8c8d", lw=0.9, alpha=0.85, zorder=3)  # top
     face(ax, [(aw,xw,0),(aw,bl,0),(aw,bl,ch),(aw,xw,ch)],
-         GRY_SIDE,  ec="#7f8c8d", lw=0.8, alpha=0.7, zorder=3)
+         GRY_SIDE,  ec="#7f8c8d", lw=0.8, alpha=0.7, zorder=3)   # right
     face(ax, [(0,xw,0),(0,bl,0),(0,bl,ch),(0,xw,ch)],
-         GRY_FRONT, ec="#7f8c8d", lw=0.8, alpha=0.5, zorder=3)
+         GRY_FRONT, ec="#7f8c8d", lw=0.8, alpha=0.5, zorder=3)   # left
     face(ax, [(0,bl,0),(aw,bl,0),(aw,bl,ch),(0,bl,ch)],
-         GRY_FRONT, ec="#7f8c8d", lw=0.8, alpha=0.4, zorder=2)
+         GRY_FRONT, ec="#7f8c8d", lw=0.8, alpha=0.4, zorder=2)   # back
 
-    # BENODIGDE block (front part: y from 0 to xw)
+    # ── BENODIGDE block (front part: y from 0 to xw) ─────────────────────
     face(ax, [(0,0,0),(aw,0,0),(aw,xw,0),(0,xw,0)],
-         RED_SIDE,  ec="#1a1a2e", lw=1.1, zorder=4)
+         RED_SIDE,  ec="#1a1a2e", lw=1.1, zorder=4)               # bottom
     face(ax, [(0,0,ch),(aw,0,ch),(aw,xw,ch),(0,xw,ch)],
-         RED_TOP,   ec="#1a1a2e", lw=1.1, zorder=5)
+         RED_TOP,   ec="#1a1a2e", lw=1.1, zorder=5)               # top
     face(ax, [(aw,0,0),(aw,xw,0),(aw,xw,ch),(aw,0,ch)],
-         RED_SIDE,  ec="#1a1a2e", lw=1.1, zorder=5)
+         RED_SIDE,  ec="#1a1a2e", lw=1.1, zorder=5)               # right
     face(ax, [(0,0,0),(aw,0,0),(aw,0,ch),(0,0,ch)],
-         RED_FRONT, ec="#1a1a2e", lw=1.5, zorder=6)
+         RED_FRONT, ec="#1a1a2e", lw=1.5, zorder=6)               # front
+    face(ax, [(0,0,0),(0,xw,0),(0,xw,ch),(0,0,ch)],
+         RED_SIDE,  ec="#1a1a2e", lw=1.1, zorder=5)               # left
 
-    # Cut face
+    # ── Cut face (light pink, at y=xw) ───────────────────────────────────
     face(ax, [(0,xw,0),(aw,xw,0),(aw,xw,ch),(0,xw,ch)],
          CUT_FACE, ec=RED_FRONT, lw=2.0, zorder=7)
 
-    # Dashed cut line
+    # ── Dashed cut line ───────────────────────────────────────────────────
     p_tl = iso(0,  xw, ch)
     p_tr = iso(aw, xw, ch)
     ax.plot([p_tl[0], p_tr[0]], [p_tl[1], p_tr[1]],
             "--", color=RED_FRONT, lw=1.8, dashes=(5, 3), zorder=8)
 
-    # Saw blade
+    # ── Saw blade ─────────────────────────────────────────────────────────
     saw_center = (p_tl + p_tr) / 2 + np.array([0, 0.9])
     saw_r = 0.55
     circle = plt.Circle(saw_center, saw_r,
@@ -106,8 +108,8 @@ def draw_strip_diagram(A: float, B: float, C: float, D: float, X: float):
     ax.add_patch(circle)
     for ang in np.linspace(0, 360, 20, endpoint=False):
         r = np.radians(ang)
-        t1 = saw_center + saw_r        * np.array([np.cos(r), np.sin(r)])
-        t2 = saw_center + (saw_r+0.14) * np.array([np.cos(r), np.sin(r)])
+        t1 = saw_center + saw_r         * np.array([np.cos(r), np.sin(r)])
+        t2 = saw_center + (saw_r + 0.14)* np.array([np.cos(r), np.sin(r)])
         ax.plot([t1[0], t2[0]], [t1[1], t2[1]], color="#2c3e50", lw=1.3, zorder=10)
     ax.plot(*saw_center, "o", color="#2c3e50", ms=5, zorder=11)
     cut_mid = (p_tl + p_tr) / 2
@@ -115,17 +117,19 @@ def draw_strip_diagram(A: float, B: float, C: float, D: float, X: float):
                 arrowprops=dict(arrowstyle="-|>", color="#2c3e50",
                                 lw=1.2, mutation_scale=10), zorder=12)
 
-    # DIMENSIONS
+    # ── DIMENSIONS ────────────────────────────────────────────────────────
     dim_arrow(ax, (0,0,0), (aw,0,0),
               f"A = {int(A)} mm", color="#1a1a2e", perp=(0, -0.6))
+
     dim_arrow(ax, (aw,0,0), (aw,bl,0),
               f"B = {int(B)} mm", color="#374151", perp=(0.7, -0.35))
+
     dim_arrow(ax, (0,0,0), (0,xw,0),
               f"X = {int(X)} mm", color=RED_FRONT, perp=(-0.7, -0.35))
 
     p_br  = iso(aw, 0, 0)
     p_tr2 = iso(aw, 0, ch)
-    off = np.array([0.55, 0])
+    off   = np.array([0.55, 0])
     ax.annotate("", xy=p_tr2 + off, xytext=p_br + off,
                 arrowprops=dict(arrowstyle="<->", color="#374151",
                                 lw=1.3, mutation_scale=10), zorder=15)
@@ -143,7 +147,7 @@ def draw_strip_diagram(A: float, B: float, C: float, D: float, X: float):
             bbox=dict(boxstyle="round,pad=0.25", fc="white",
                       ec="#374151", lw=0.8, alpha=0.95))
 
-    # LEGEND
+    # ── LEGEND ────────────────────────────────────────────────────────────
     patches = [
         mpatches.Patch(facecolor=RED_FRONT, edgecolor="#1a1a2e", label="Benodigde strip"),
         mpatches.Patch(facecolor=GRY_TOP,   edgecolor="#7f8c8d", label="Restant"),
